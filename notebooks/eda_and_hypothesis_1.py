@@ -10,10 +10,15 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
 from scipy import stats
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
-df = pd.read_csv('panel_dataset.csv')
+BASE_DIR = Path(__file__).resolve().parent
+FIGURES_DIR = BASE_DIR.parent / 'figures'
+FIGURES_DIR.mkdir(exist_ok=True)
+
+df = pd.read_csv(BASE_DIR / 'panel_dataset.csv')
 
 plt.rcParams.update({
     'figure.facecolor': 'white', 'axes.facecolor': '#f5f5f5',
@@ -65,7 +70,7 @@ fig.legend(handles=patches, loc='lower center', ncol=5,
 fig.suptitle('Turkey Inbound Tourism by Market Group (2003–2025)\nIMF + TÜİK Data',
              fontsize=14, fontweight='bold')
 plt.tight_layout()
-plt.savefig('../figures/fig1_trends_by_group.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'fig1_trends_by_group.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 1 saved")
 
@@ -115,7 +120,7 @@ fig.legend(handles=legend_patches, loc='lower center', ncol=4,
 fig.suptitle('Shock Sensitivity by Market: % Change vs Pre-Shock Baseline\n(Source: TÜİK, IMF)',
              fontsize=13, fontweight='bold')
 plt.tight_layout()
-plt.savefig('../figures/fig2_shock_sensitivity.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'fig2_shock_sensitivity.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 2 saved")
 
@@ -174,7 +179,7 @@ fig.legend(handles=legend_patches, loc='lower center', ncol=4,
 fig.suptitle('Recovery Speed by Market After Major Shocks\n(Source: TÜİK)',
              fontsize=13, fontweight='bold')
 plt.tight_layout()
-plt.savefig('../figures/fig3_recovery_speed.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'fig3_recovery_speed.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 3 saved")
 
@@ -229,7 +234,7 @@ ax.set_ylabel('Total Visitors (millions)')
 fig.suptitle("Turkey's Own Conditions as Pull/Push Factors\n(Source: IMF, World Bank WGI, TÜİK)",
              fontsize=13, fontweight='bold')
 plt.tight_layout()
-plt.savefig('../figures/fig4_turkey_conditions.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'fig4_turkey_conditions.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 4 saved")
 
@@ -276,7 +281,7 @@ ax.set_title('Market Resilience Heatmap: % vs 2017-19 Baseline\n'
 ax.set_xlabel('Year')
 ax.set_ylabel('')
 plt.tight_layout()
-plt.savefig('../figures/fig5_resilience_heatmap.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'fig5_resilience_heatmap.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 5 saved")
 
@@ -458,4 +463,3 @@ print("""
       → Pearson + Spearman correlation
       → Controls for wealth in demand modelling
 """)
-
