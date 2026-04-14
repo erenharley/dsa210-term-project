@@ -392,5 +392,7 @@ print(f"\nFinal panel: {df.shape}")
 print(f"Columns: {df.columns.tolist()}")
 print(f"\nMissing values:\n{df.isnull().sum()[df.isnull().sum()>0]}")
 
-df.to_csv('panel_dataset.csv', index=False)
-print("\n✓ Saved: panel_dataset.csv")
+from pathlib import Path
+out_path = Path(__file__).resolve().parent.parent / 'data' / 'panel_dataset.csv'
+df.to_csv(out_path, index=False)
+print(f"\n✓ Saved: {out_path}")

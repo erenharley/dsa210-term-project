@@ -15,10 +15,10 @@ import warnings
 warnings.filterwarnings('ignore')
 
 BASE_DIR = Path(__file__).resolve().parent
-FIGURES_DIR = BASE_DIR.parent / 'figures'
+FIGURES_DIR = BASE_DIR.parent / 'images'
 FIGURES_DIR.mkdir(exist_ok=True)
 
-df = pd.read_csv(BASE_DIR / 'panel_dataset.csv')
+df = pd.read_csv(BASE_DIR.parent / 'data' / 'panel_dataset.csv')
 
 plt.rcParams.update({
     'figure.facecolor': 'white', 'axes.facecolor': '#f5f5f5',
