@@ -28,9 +28,9 @@ dsa210-term-project/
 │   └── fetch_macro_data.py                        # One-time script that fetched IMF + WB data
 ├── notebooks/
 │   ├── 01_data_pipeline.py                        # Merges all sources → data/panel_dataset.csv
-│   ├── 02_eda_and_hypothesis.py                   # EDA figures + 5 hypothesis tests
+│   ├── 02_eda_and_hypothesis.py                   # EDA figures + 6 hypothesis tests (H1-H6)
 │   └── project_analysis.ipynb                     # Interactive notebook
-├── images/                                        # Output figures (fig1–fig5)
+├── images/                                        # Output figures (fig1–fig6)
 ├── DSA210_Project_Proposal.pdf
 ├── requirements.txt
 └── README.md
@@ -88,13 +88,35 @@ jupyter lab notebooks/project_analysis.ipynb
 
 ---
 
-## Key Findings (Phase 3)
+## Key Findings (Phase 3, post-redesign)
 
-- Western Europe was most sensitive to Turkey's domestic shocks (−32% visitors in 2016 coup)
-- Former Soviet markets were the slowest to recover post-COVID (avg ~4 years)
-- Turkey currency weakness correlates with *larger* visitor drops (Pearson r = −0.68, p < 0.001) — the crisis effect dominates any price/affordability benefit
-- Source country GDP per capita significantly predicts visitor volume (Spearman r = 0.22, p < 0.001)
-- Georgia, Greece, and Iraq had not recovered to their 2017–19 baseline by 2025
+Results are reported from actual tests run on `data/panel_dataset.csv`. Only
+statistically significant findings are stated as findings; non-significant
+results are reported as descriptive observations.
+
+**Statistically significant (α = 0.05):**
+- Turkey currency weakness (PPP rate) correlates strongly with *larger* visitor
+  drops during shock years — Pearson r = −0.79, p < 0.001 (H4). The crisis and
+  instability effect dominates the naive "cheap Turkey = more tourists" price effect.
+- Source country GDP per capita positively predicts visitor volume —
+  Spearman r = 0.22, p < 0.001 (H5). Wealthier source markets send more tourists,
+  though the effect is weak.
+
+**Descriptive (not statistically significant at α = 0.05):**
+- Western Europe showed the largest mean drop in 2016 (−32%), followed by
+  Former Soviet (−21%) and MENA (−16%), but group differences did not reach
+  significance (ANOVA F = 0.64, p = 0.61, H1). High within-group variance prevents
+  a formal claim.
+- Former Soviet markets recovered most slowly post-COVID (mean 4.0 years vs
+  2.0 for Western Europe), but recovery speed differences across groups were not
+  significant (ANOVA F = 2.95, p = 0.11, H3).
+- MENA markets averaged only +1.4% above their 2017–19 baseline in 2023–25,
+  well below the non-MENA average of +37.8%, but the small MENA sample (n = 4)
+  prevented significance (Welch t = −1.45, p = 0.17, H6).
+- Georgia, Greece, and Iraq had not recovered to their 2017–19 baseline by 2025.
+- Iraq visitor counts grew +160% during the Syria war period (2011–15 vs 2008–10
+  baseline), which masked any aggregate MENA suppression effect in H2
+  (Welch t = 0.41, p = 0.71).
 
 ---
 
@@ -107,7 +129,7 @@ jupyter lab notebooks/project_analysis.ipynb
 | Turkey coup attempt | 2016 | `coup_2016` |
 | COVID-19 pandemic | 2020–2021 | `covid` |
 | Russia-Ukraine war | 2022+ | `russia_ukraine_war` |
-| Rising MENA tensions | 2023+ | `mena_tension` |
+| Rising MENA tensions | 2023+ | `mena_tension_recent` |
 
 ---
 

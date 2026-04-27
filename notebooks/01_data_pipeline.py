@@ -348,7 +348,11 @@ df['coup_2016']           = (df['year'] == 2016).astype(int)
 df['syria_conflict']      = df['year'].between(2011, 2015).astype(int)
 df['russia_turkey_crisis']= (df['year'] == 2015).astype(int)
 df['russia_ukraine_war']  = (df['year'] >= 2022).astype(int)
-df['mena_tension']        = (df['year'].between(2011,2015) | (df['year'] >= 2023)).astype(int)
+# mena_tension_recent covers ONLY the post-2023 period.
+# The old combined dummy (2011-2015 OR 2023+) was scrapped — it merged two unrelated
+# shock regimes (Syria war vs post-Oct-2023 MENA tensions) into one meaningless coefficient.
+# syria_conflict already covers 2011-2015; keep them separate for ML in Phase 4.
+df['mena_tension_recent'] = (df['year'] >= 2023).astype(int)
 
 # YoY % change in visitors
 df['visitors_yoy'] = df.groupby('country')['visitors'].pct_change() * 100
