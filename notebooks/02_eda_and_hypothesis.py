@@ -164,9 +164,10 @@ print(f"Kruskal-Wallis:     H={h1_kw_stat:.3f},  p={p1_kw:.4f}  "
 
 # --- Fig 1 ---
 np.random.seed(42)
-fig, ax = plt.subplots(figsize=(11, 6))
+fig, ax = plt.subplots(figsize=(12, 7))
 
 group_means_h1 = coup_df.groupby('group')['impact'].mean()
+group_ns_h1 = coup_df.groupby('group')['impact'].count()
 
 for i, group in enumerate(group_order_h1):
     sub = coup_df[coup_df['group'] == group]
@@ -182,45 +183,43 @@ for i, group in enumerate(group_order_h1):
                     va='center', alpha=0.85)
     mn = group_means_h1.get(group, np.nan)
     if not np.isnan(mn):
-        ax.hlines(i, mn - 3, mn + 3, color=GROUP_COLORS[group], lw=4, zorder=4)
-        ax.annotate(f'mean: {mn:+.0f}%', (mn, i + 0.30),
+        # draw a visible mean band spanning ±8% around the mean
+        grp_vals = sub['impact'].values
+        band_hw = max(abs(grp_vals.max() - grp_vals.min()) * 0.08, 5)
+        ax.fill_betweenx([i - 0.12, i + 0.12], mn - band_hw, mn + band_hw,
+                         color=GROUP_COLORS[group], alpha=0.35, zorder=4)
+        ax.vlines(mn, i - 0.15, i + 0.15, color=GROUP_COLORS[group], lw=3, zorder=5)
+        ax.annotate(f'mean: {mn:+.0f}%', (mn, i + 0.33),
                     ha='center', fontsize=8.5,
                     color=GROUP_COLORS[group], fontweight='bold')
 
 ax.axvline(0, color='black', lw=1.2, ls='--', alpha=0.5)
 ax.set_yticks(range(len(group_order_h1)))
-ax.set_yticklabels(group_order_h1)
+ax.set_yticklabels([
+    f'{g}  (n={group_ns_h1.get(g, 0)})' for g in group_order_h1
+])
 ax.set_xlabel('% Change in Visitors vs 2014-15 Baseline')
 
+# Test stats moved below plot — avoids overlapping data points
 annot1 = (
     f"ANOVA: F={f1_stat:.2f}, p={p1_anova:.3f}  "
-    f"({'significant' if p1_anova < 0.05 else 'not significant'})\n"
+    f"({'significant' if p1_anova < 0.05 else 'not significant'})   |   "
     f"Kruskal-Wallis: H={h1_kw_stat:.2f}, p={p1_kw:.3f}  "
-    f"({'significant' if p1_kw < 0.05 else 'not significant'})\n"
+    f"({'significant' if p1_kw < 0.05 else 'not significant'})   |   "
     f"'Other' (USA, n=1) excluded from both tests"
 )
-ax.text(0.02, 0.97, annot1, transform=ax.transAxes,
-        fontsize=8, va='top', ha='left',
-        bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
+fig.text(0.5, -0.03, annot1, ha='center', fontsize=8.5,
+         bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
 
 # Finding-driven title — omnibus only; no pairwise/directional group claims
 if p1_anova < 0.05 and p1_kw < 0.05:
-    fig1_title = (
-        f"Market Groups Differ Significantly in 2016 Coup Sensitivity "
-        f"(ANOVA p={p1_anova:.3f}, Kruskal-Wallis p={p1_kw:.3f})"
-    )
+    fig1_title = "Market Groups Differ Significantly in 2016 Coup Sensitivity"
 elif p1_anova < 0.05 or p1_kw < 0.05:
-    fig1_title = (
-        f"2016 Coup Sensitivity: Mixed Evidence Across Tests "
-        f"(ANOVA p={p1_anova:.3f}, Kruskal-Wallis p={p1_kw:.3f}) — Interpret With Caution"
-    )
+    fig1_title = "2016 Coup Sensitivity: Mixed Evidence Across Tests — Interpret With Caution"
 else:
-    fig1_title = (
-        f"No Significant Difference in 2016 Coup Sensitivity Across Market Groups "
-        f"(ANOVA p={p1_anova:.3f}, Kruskal-Wallis p={p1_kw:.3f})"
-    )
+    fig1_title = "No Significant Difference in 2016 Coup Sensitivity Across Market Groups"
 
-ax.set_title(fig1_title, fontweight='bold', pad=12, wrap=True)
+ax.set_title(fig1_title, fontweight='bold', pad=12)
 plt.tight_layout()
 plt.savefig(FIGURES_DIR / 'fig1_h1_coup_sensitivity.png', dpi=150, bbox_inches='tight')
 plt.close()
@@ -291,59 +290,76 @@ for country in all_countries:
     dur_v = dur_means_h2[country] / 1e6
     group = df[df['country'] == country]['market_group'].values[0]
     color = GROUP_COLORS[group]
-    is_bordering   = country in SYRIA_BORDERING
+    is_bordering    = country in SYRIA_BORDERING
     is_syria_itself = (country == 'Syria')
 
     ax.plot(
         [0, 1], [pre_v, dur_v],
         color=color,
-        alpha=0.95 if is_bordering else (0.65 if is_syria_itself else 0.35),
-        lw=3.0  if is_bordering else (2.0  if is_syria_itself else 1.2),
+        alpha=0.90 if is_bordering else (0.60 if is_syria_itself else 0.18),
+        lw=3.0  if is_bordering else (2.0  if is_syria_itself else 1.0),
         ls='-'  if is_bordering else ('--' if is_syria_itself else ':')
     )
     ax.scatter([0, 1], [pre_v, dur_v], color=color,
                s=70 if is_bordering else 25,
-               alpha=0.9 if is_bordering else 0.5, zorder=3)
-    label = country + ('*' if is_bordering else ' (excl.)' if is_syria_itself else '')
-    ax.annotate(label, (1.03, dur_v),
-                fontsize=7.5 if is_bordering else 6.5, va='center', color=color,
-                fontweight='bold' if is_bordering else 'normal')
+               alpha=0.9 if is_bordering else 0.4, zorder=3)
+    # Label only the highlighted lines; background countries are unlabelled
+    if is_bordering or is_syria_itself:
+        label = country + ('*' if is_bordering else ' (excl.)')
+        ax.annotate(label, (1.03, dur_v),
+                    fontsize=8.0, va='center', color=color,
+                    fontweight='bold' if is_bordering else 'normal')
 
 ax.set_xticks([0, 1])
 ax.set_xticklabels(['Pre-war\n(2008-10 mean)', 'War period\n(2011-15 mean)'], fontsize=10)
 ax.set_ylabel('Mean Annual Visitors (millions)')
-ax.set_xlim(-0.12, 1.48)
-ax.set_title('* = Syria-bordering (in test)   Syria (conflict origin) shown dashed, excluded', fontsize=9)
+ax.set_xlim(-0.12, 1.52)
+ax.set_title('* = Syria-bordering markets (in test)   Syria shown dashed, excluded from test',
+             fontsize=9)
 
 legend_patches = [mpatches.Patch(color=c, label=g)
                   for g, c in GROUP_COLORS.items() if g != 'Other']
 ax.legend(handles=legend_patches, loc='upper left', fontsize=8)
 
+# Right panel: strip/dot plot of actual values (replaces misleading low-n histogram)
+ax2 = axes[1]
+np.random.seed(7)
+jitter_b  = np.random.uniform(-0.08, 0.08, size=len(bordering_chg))
+jitter_nb = np.random.uniform(-0.08, 0.08, size=len(non_bordering_chg))
+
+ax2.scatter(np.zeros(len(non_bordering_chg)) + jitter_nb, non_bordering_chg,
+            color='#607D8B', s=70, alpha=0.75, zorder=3, label='Non-bordering')
+ax2.scatter(np.ones(len(bordering_chg)) + jitter_b, bordering_chg,
+            color=GROUP_COLORS['MENA'], s=90, alpha=0.90, zorder=3, label='Syria-bordering*')
+
+# Draw group means as horizontal lines
+ax2.hlines(non_bordering_chg.mean(), -0.25, 0.25, color='#607D8B', lw=2.5, zorder=4)
+ax2.hlines(bordering_chg.mean(),     0.75,  1.25, color=GROUP_COLORS['MENA'], lw=2.5, zorder=4)
+ax2.annotate(f'mean\n{non_bordering_chg.mean():+.0f}%', (-0.28, non_bordering_chg.mean()),
+             ha='right', va='center', fontsize=8, color='#607D8B', fontweight='bold')
+ax2.annotate(f'mean\n{bordering_chg.mean():+.0f}%', (1.28, bordering_chg.mean()),
+             ha='left', va='center', fontsize=8, color=GROUP_COLORS['MENA'], fontweight='bold')
+
+ax2.axhline(0, color='black', lw=1, ls='--', alpha=0.5)
+ax2.set_xticks([0, 1])
+ax2.set_xticklabels([f'Non-bordering\n(n={len(non_bordering_chg)})',
+                     f'Syria-bordering*\n(n={len(bordering_chg)})'], fontsize=9)
+ax2.set_ylabel('% Change (2011-15 vs 2008-10)')
+ax2.set_xlim(-0.5, 1.5)
+ax2.set_title('Actual Values by Group\n(horizontal bar = group mean)', fontsize=9)
+
+# Test stats below the plot — avoids overlapping the slope chart's data
 stat2_txt = (
     f"Levene: W={h2_result['lev_stat']:.2f}, p={h2_result['lev_p']:.3f}  "
-    f"-> {'equal var' if h2_result['equal_var'] else 'unequal var'}\n"
+    f"-> {'equal var' if h2_result['equal_var'] else 'unequal var'}   |   "
     f"{h2_result['stat_label']}, p={h2_result['main_p']:.3f}  "
-    f"({'significant' if h2_result['significant'] else 'not significant'})\n"
-    f"Syria-bordering: {bordering_chg.mean():+.0f}%   Non-bordering: {non_bordering_chg.mean():+.0f}%\n"
+    f"({'significant' if h2_result['significant'] else 'not significant'})   |   "
+    f"Syria-bordering: {bordering_chg.mean():+.0f}% (n={len(bordering_chg)})   "
+    f"Non-bordering: {non_bordering_chg.mean():+.0f}% (n={len(non_bordering_chg)})   "
     f"Note: 2008-10 trough -> most markets show absolute gains over 2011-15"
 )
-ax.text(0.02, 0.03, stat2_txt, transform=ax.transAxes,
-        ha='left', fontsize=8,
-        bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
-
-# Right panel: distribution comparison
-ax2 = axes[1]
-ax2.hist(non_bordering_chg, bins=8, alpha=0.55, color='#607D8B',
-         label=f'Non-bordering (mean {non_bordering_chg.mean():+.0f}%)',
-         orientation='horizontal', density=True)
-ax2.hist(bordering_chg, bins=4, alpha=0.80, color=GROUP_COLORS['MENA'],
-         label=f'Syria-bordering (mean {bordering_chg.mean():+.0f}%)',
-         orientation='horizontal', density=True)
-ax2.axhline(0, color='black', lw=1, ls='--', alpha=0.5)
-ax2.set_xlabel('Density')
-ax2.set_ylabel('% Change (2011-15 vs 2008-10)')
-ax2.legend(fontsize=8)
-ax2.set_title('Distribution\nComparison', fontsize=9)
+fig.text(0.5, -0.04, stat2_txt, ha='center', fontsize=8.5,
+         bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
 
 # Finding-driven title
 if h2_result['significant']:
@@ -363,7 +379,7 @@ else:
         f"({h2_result['stat_label']}, p={h2_result['main_p']:.3f})"
     )
 
-fig.suptitle(fig2_title, fontweight='bold', fontsize=11, y=1.01)
+fig.suptitle(fig2_title, fontweight='bold', fontsize=11)
 plt.tight_layout()
 plt.savefig(FIGURES_DIR / 'fig2_h2_syria_mena.png', dpi=150, bbox_inches='tight')
 plt.close()
@@ -428,12 +444,13 @@ df_fig3['pct_of_baseline'] = df_fig3['visitors'] / df_fig3['baseline_covid'] * 1
 
 # --- Fig 3 ---
 group_order_fig3 = ['Western Europe', 'Eastern Europe', 'Former Soviet', 'MENA']
-fig, axes = plt.subplots(2, 2, figsize=(14, 10), sharey=True)
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))   # sharey removed — Russia spike ~350% squashes others
 
-for ax, group in zip(axes.flatten(), group_order_fig3):
+for panel_idx, (ax, group) in enumerate(zip(axes.flatten(), group_order_fig3)):
     countries_g = df[df['market_group'] == group]['country'].unique()
-    ax.axhline(100, color='black', lw=1.5, ls='--', alpha=0.65, label='Pre-COVID baseline')
+    baseline_line = ax.axhline(100, color='black', lw=1.5, ls='--', alpha=0.65)
 
+    star_plotted = False
     for country in countries_g:
         sub = df_fig3[df_fig3['country'] == country].sort_values('year')
         ax.plot(sub['year'], sub['pct_of_baseline'],
@@ -441,9 +458,11 @@ for ax, group in zip(axes.flatten(), group_order_fig3):
         cross = sub[sub['pct_of_baseline'] >= 100]
         if not cross.empty:
             fc = cross.iloc[0]
-            ax.scatter(fc['year'], fc['pct_of_baseline'],
-                       color=GROUP_COLORS[group], s=140, zorder=5,
-                       marker='*', edgecolors='black', lw=0.5)
+            sc = ax.scatter(fc['year'], fc['pct_of_baseline'],
+                            color=GROUP_COLORS[group], s=140, zorder=5,
+                            marker='*', edgecolors='black', lw=0.5,
+                            label='Year of full recovery' if not star_plotted else '_nolegend_')
+            star_plotted = True
 
     group_mean_traj = (
         df_fig3[df_fig3['market_group'] == group]
@@ -458,7 +477,13 @@ for ax, group in zip(axes.flatten(), group_order_fig3):
     ax.set_title(group, fontweight='bold', color=GROUP_COLORS[group])
     ax.set_xlabel('Year')
     ax.set_ylabel('Visitors as % of 2018-19 Baseline')
-    ax.legend(fontsize=8)
+
+    # Build legend: baseline line shown only in the first panel to avoid repetition
+    handles, labels = ax.get_legend_handles_labels()
+    if panel_idx == 0:
+        handles = [baseline_line] + handles
+        labels  = ['Pre-COVID baseline (100%)'] + labels
+    ax.legend(handles=handles, labels=labels, fontsize=8)
 
 stat3_parts = []
 if not np.isnan(f3_stat):
@@ -547,58 +572,87 @@ print(f"Direction: {'Higher YoY weakness -> LARGER visitor drop (negative r)' if
 print(f"{'SIGNIFICANT' if p4 < 0.05 else 'NOT SIGNIFICANT'} at alpha=0.05")
 
 # --- Fig 4 ---
-fig, ax = plt.subplots(figsize=(11, 7))
+# Design note: only 3 distinct shock years → 3 vertical strips on the x-axis.
+# Pearson r is therefore driven almost entirely by the year-to-year shift in both
+# currency weakness AND visitor impact, not a continuous lira-visitor relationship.
+# Visualization: strip plot by shock year with jitter; no OLS line (extrapolation
+# unsupported by 3-year structure); Pearson r reported but framed honestly.
+fig, ax = plt.subplots(figsize=(12, 7))
+
+np.random.seed(17)
+jitter_scale = 0.4  # visual spread within each year's strip
+
+# Year-column x-positions (spread out so strips don't overlap with other years)
+year_x = {2009: 0, 2016: 8, 2020: 14}
+res_h4['x_pos'] = res_h4['shock_year'].map(year_x)
 
 for group in GROUP_COLORS:
-    sub = res_h4[res_h4['group'] == group]
+    sub = res_h4[res_h4['group'] == group].copy()
     if sub.empty:
         continue
-    ax.scatter(sub['tur_currency_weakness'], sub['impact'],
-               color=GROUP_COLORS[group], s=90, alpha=0.75, zorder=3,
+    jitter = np.random.uniform(-jitter_scale, jitter_scale, size=len(sub))
+    ax.scatter(sub['x_pos'] + jitter, sub['impact'],
+               color=GROUP_COLORS[group], s=90, alpha=0.80, zorder=3,
                edgecolors='white', lw=0.6, label=group)
 
+# Annotate only outliers (beyond 1.5 IQR) to avoid label collisions
+q1, q3 = res_h4['impact'].quantile([0.25, 0.75])
+iqr = q3 - q1
+outlier_thresh_lo = q1 - 1.5 * iqr
+outlier_thresh_hi = q3 + 1.5 * iqr
 for _, row in res_h4.iterrows():
-    ax.annotate(
-        f"{row['country'][:3]}\n'{str(row['shock_year'])[2:]}",
-        (row['tur_currency_weakness'], row['impact']),
-        fontsize=6.5, xytext=(4, 3), textcoords='offset points', alpha=0.70
-    )
+    if row['impact'] < outlier_thresh_lo or row['impact'] > outlier_thresh_hi:
+        jitter_x = np.random.uniform(-jitter_scale, jitter_scale)
+        ax.annotate(
+            f"{row['country'][:4]}",
+            (row['x_pos'] + jitter_x, row['impact']),
+            fontsize=7, xytext=(5, 3), textcoords='offset points', alpha=0.80
+        )
 
-x4 = res_h4['tur_currency_weakness']
-y4 = res_h4['impact']
-m4, b4 = np.polyfit(x4, y4, 1)
-x4_range = np.linspace(x4.min(), x4.max(), 100)
-ax.plot(x4_range, m4 * x4_range + b4, 'r--', lw=2,
-        label=f'OLS (slope={m4:.2f}% per 1% currency weakness)')
+# Year-group means and IQR boxes (one per shock year)
+for yr, xp in year_x.items():
+    vals = res_h4[res_h4['shock_year'] == yr]['impact']
+    mn = vals.mean()
+    ax.hlines(mn, xp - 0.55, xp + 0.55, color='black', lw=2.5, zorder=5)
+    ax.annotate(f'mean={mn:+.0f}%\n(n={len(vals)})', (xp, vals.max() + 5),
+                ha='center', fontsize=8.5, fontweight='bold')
+    # Label the lira weakness value for each shock year
+    cw = res_h4[res_h4['shock_year'] == yr]['tur_currency_weakness'].iloc[0]
+    ax.annotate(f'{yr}\nΔlira={cw:+.1f}%', (xp, ax.get_ylim()[0] if ax.get_ylim()[0] < -150 else -155),
+                ha='center', fontsize=9, fontweight='bold',
+                color='#555555')
 
-ax.axhline(0, color='black', lw=1, alpha=0.4)
-ax.set_xlabel('Turkey YoY Currency Weakness  (% change in PPP rate; higher = weaker lira)')
-ax.set_ylabel('% Change in Visitors vs Pre-Shock Baseline')
+ax.axhline(0, color='black', lw=1, alpha=0.4, ls='--')
+ax.set_xticks(list(year_x.values()))
+ax.set_xticklabels([f'2009\n(Δlira={res_h4[res_h4["shock_year"]==2009]["tur_currency_weakness"].iloc[0]:+.1f}%)',
+                    f'2016\n(Δlira={res_h4[res_h4["shock_year"]==2016]["tur_currency_weakness"].iloc[0]:+.1f}%)',
+                    f'2020\n(Δlira={res_h4[res_h4["shock_year"]==2020]["tur_currency_weakness"].iloc[0]:+.1f}%)'],
+                   fontsize=9)
+ax.set_xlabel('Shock Year  (Turkey YoY lira weakness shown per year)')
+ax.set_ylabel('% Change in Visitors vs Pre-Shock Baseline (17 countries each year)')
 ax.legend(fontsize=8, loc='upper right')
 
 stat4_txt = (
-    f"Pearson r = {r4:.3f},  p = {p4:.3f}\n"
-    f"n = {len(res_h4)} obs. (17 countries x 3 shock years)\n"
-    f"Caveat: only 3 shock years sampled;\n"
-    f"cumulative vs instantaneous lira weakness not separated."
+    f"Pearson r = {r4:.3f},  p = {p4:.3f}   |   n = {len(res_h4)} obs. (17 countries × 3 shock years)\n"
+    f"Note: correlation is driven by only 3 distinct lira-weakness values (one per shock year);\n"
+    f"it reflects year-level differences rather than a continuous lira-visitor relationship."
 )
-ax.text(0.02, 0.04, stat4_txt, transform=ax.transAxes,
-        fontsize=8, va='bottom', ha='left',
-        bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
+fig.text(0.5, -0.04, stat4_txt, ha='center', fontsize=8.5,
+         bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
 
 if r4 < 0 and p4 < 0.05:
     fig4_title = (
-        f"Weaker Lira (YoY) Accompanies Larger Visitor Drops During Shocks "
-        f"(Pearson r={r4:.2f}, p={p4:.3f})"
+        f"Visitor Impact Varies by Shock Year; Lira Weakness Co-varies With Year "
+        f"(Pearson r={r4:.2f}, p={p4:.3f} — driven by 3-year structure, not continuous lira trend)"
     )
 elif r4 < 0:
     fig4_title = (
-        f"Negative Lira-Visitor Relationship — Not Statistically Significant "
-        f"(Pearson r={r4:.2f}, p={p4:.3f})"
+        f"Visitor Impact Varies by Shock Year; Negative Lira Correlation Not Significant "
+        f"(Pearson r={r4:.2f}, p={p4:.3f} — only 3 distinct shock years)"
     )
 else:
     fig4_title = (
-        f"No Negative Lira-Visitor Relationship Detected in Shock Years "
+        f"Visitor Impact Varies by Shock Year; No Negative Lira-Visitor Relationship Detected "
         f"(Pearson r={r4:.2f}, p={p4:.3f})"
     )
 
@@ -644,7 +698,7 @@ for g in ['Western Europe', 'Eastern Europe', 'Former Soviet', 'MENA', 'Other']:
         print(f"    {g:20s}: n={len(sub)} — too small for reliable correlation")
 
 # --- Fig 5 ---
-fig, ax = plt.subplots(figsize=(11, 7))
+fig, ax = plt.subplots(figsize=(12, 7))
 
 for group in GROUP_COLORS:
     sub = df_h5[df_h5['market_group'] == group]
@@ -652,34 +706,46 @@ for group in GROUP_COLORS:
                color=GROUP_COLORS[group], alpha=0.40, s=40,
                edgecolors='none', label=group)
 
+# Aggregate OLS (dashed, thicker so it's visible through the scatter)
 x5 = np.log(df_h5['gdp_per_capita'])
 y5 = df_h5['log_visitors']
 m5, b5 = np.polyfit(x5, y5, 1)
 x5_range = np.linspace(x5.min(), x5.max(), 100)
-ax.plot(x5_range, m5 * x5_range + b5, 'r--', lw=2, label='OLS trend (aggregate)')
+ax.plot(x5_range, m5 * x5_range + b5, color='black', lw=2.5, ls='--',
+        alpha=0.70, label='OLS (aggregate)')
+
+# Per-group regression lines — make the within-group divergence visible
+for group in ['Western Europe', 'Eastern Europe', 'Former Soviet', 'MENA']:
+    sub = df_h5[df_h5['market_group'] == group]
+    if len(sub) < 5:
+        continue
+    xg = np.log(sub['gdp_per_capita'])
+    yg = sub['log_visitors']
+    mg, bg = np.polyfit(xg, yg, 1)
+    xg_range = np.linspace(xg.min(), xg.max(), 50)
+    ax.plot(xg_range, mg * xg_range + bg,
+            color=GROUP_COLORS[group], lw=1.8, ls='-', alpha=0.75)
 
 ax.set_xlabel('log(Source Country GDP per Capita, USD)')
 ax.set_ylabel('log(Annual Visitors to Turkey)')
 
+# Per-group Spearman summary for figtext — full group names, no truncation
 per_group_lines = []
 for g in ['Western Europe', 'Eastern Europe', 'Former Soviet', 'MENA', 'Other']:
     rg, pg, ng = group_spearman_h5[g]
     if not np.isnan(rg):
         sig_mark = '*' if pg < 0.05 else ''
-        per_group_lines.append(f"  {g[:12]:12s}: r={rg:+.2f}{sig_mark}")
+        per_group_lines.append(f"  {g:<22s}: Spearman r={rg:+.2f}{sig_mark}  (n={ng})")
     else:
-        per_group_lines.append(f"  {g[:12]:12s}: n={ng} (small)")
+        per_group_lines.append(f"  {g:<22s}: n={ng} — too small")
 
 stat5_txt = (
-    f"Aggregate  Pearson r  = {r5:.3f},  p = {p5:.4f}\n"
-    f"           Spearman r = {r5s:.3f},  p = {p5s:.4f}\n"
-    f"           n = {len(df_h5)} country-year obs.\n"
-    f"Per-group Spearman (* = p<0.05):\n"
-    + "\n".join(per_group_lines)
+    f"Aggregate  Pearson r={r5:.3f}, p={p5:.4f}   |   Spearman r={r5s:.3f}, p={p5s:.4f}   |   "
+    f"n={len(df_h5)} country-year obs.      Per-group Spearman (* = p<0.05):   "
+    + "   ".join(per_group_lines)
 )
-ax.text(0.02, 0.97, stat5_txt, transform=ax.transAxes,
-        fontsize=8.5, va='top', ha='left', family='monospace',
-        bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
+fig.text(0.5, -0.04, stat5_txt, ha='center', fontsize=8,
+         bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
 
 ax.legend(fontsize=8, loc='lower right')
 
@@ -687,7 +753,7 @@ if p5s < 0.05 and r5s > 0:
     strength5 = "Weakly positive" if abs(r5s) < 0.3 else "Moderately positive"
     fig5_title = (
         f"GDP per Capita {strength5} Relates to Visitor Volume in Aggregate "
-        f"(Spearman r={r5s:.2f}, p={p5s:.3f}); Within-Group Patterns Diverge"
+        f"(Spearman r={r5s:.2f}, p={p5s:.3f}); Within-Group Directions Diverge (colored lines)"
     )
 elif p5s < 0.05:
     fig5_title = (
@@ -697,7 +763,7 @@ elif p5s < 0.05:
 else:
     fig5_title = (
         f"GDP per Capita Does Not Significantly Predict Visitor Volume in Aggregate "
-        f"(Spearman r={r5s:.2f}, p={p5s:.3f}); Within-Group Patterns Diverge"
+        f"(Spearman r={r5s:.2f}, p={p5s:.3f}); Within-Group Patterns Diverge (colored lines)"
     )
 
 ax.set_title(fig5_title, fontweight='bold', pad=10, wrap=True)
@@ -763,6 +829,10 @@ print(
 )
 
 # --- Fig 6 ---
+# Within-MENA colors: two shades of purple consistent with MENA group color (#9C27B0)
+MENA_CONFLICT_COLOR = '#6A1B9A'  # deep purple  — conflict-affected
+MENA_STABLE_COLOR   = '#CE93D8'  # light purple — stable (UAE, Qatar)
+
 fig, axes = plt.subplots(1, 2, figsize=(16, 8), gridspec_kw={'width_ratios': [2, 1]})
 
 # Left panel: full horizontal bar chart (all 17 countries)
@@ -780,25 +850,28 @@ ax.axvline(0, color='black', lw=1.5)
 ax.set_xlabel('% Change in Mean Visitors vs 2017-19 Baseline  (2023-25 average)')
 
 for bar, val in zip(bars, h6_sorted['pct_vs_baseline']):
-    ax.text(val + (2 if val >= 0 else -2),
+    # Push value labels outside the bar area to avoid overlapping the stats box
+    ax.text(val + (3 if val >= 0 else -3),
             bar.get_y() + bar.get_height() / 2,
             f'{val:+.0f}%', va='center',
             ha='left' if val >= 0 else 'right', fontsize=8.5)
 
+mena_patch  = mpatches.Patch(color=GROUP_COLORS['MENA'], label=f'MENA (n={len(mena_h6)}, mean {mena_h6.mean():+.0f}%)')
+other_patch = mpatches.Patch(color='#aaaaaa', alpha=0.5,
+                              label=f'Non-MENA (n={len(nonmena_h6)}, mean {nonmena_h6.mean():+.0f}%)')
+ax.legend(handles=[mena_patch, other_patch], fontsize=9, loc='lower right')
+
+# Stats block moved below the plot to avoid overlapping top bars (USA, UAE, UK)
 stat6_txt = (
     f"Levene: W={h6_result['lev_stat']:.2f}, p={h6_result['lev_p']:.3f}  "
-    f"-> {'equal var' if h6_result['equal_var'] else 'unequal var'}\n"
+    f"-> {'equal var' if h6_result['equal_var'] else 'unequal var'}   |   "
     f"{h6_result['stat_label']}, p={h6_result['main_p']:.3f}  "
-    f"({'significant' if h6_result['significant'] else 'not significant'})\n"
-    f"MENA mean: {mena_h6.mean():+.0f}%    Non-MENA mean: {nonmena_h6.mean():+.0f}%"
+    f"({'significant' if h6_result['significant'] else 'not significant'})   |   "
+    f"MENA mean: {mena_h6.mean():+.0f}% (n={len(mena_h6)})   "
+    f"Non-MENA mean: {nonmena_h6.mean():+.0f}% (n={len(nonmena_h6)})"
 )
-ax.text(0.02, 0.97, stat6_txt, transform=ax.transAxes,
-        fontsize=9, va='top', ha='left',
-        bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
-
-mena_patch  = mpatches.Patch(color=GROUP_COLORS['MENA'], label='MENA markets')
-other_patch = mpatches.Patch(color='#aaaaaa', alpha=0.5,  label='Non-MENA (faded)')
-ax.legend(handles=[mena_patch, other_patch], fontsize=9, loc='lower right')
+fig.text(0.5, -0.03, stat6_txt, ha='center', fontsize=9,
+         bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
 
 # Right panel: within-MENA descriptive split
 ax2 = axes[1]
@@ -806,22 +879,26 @@ within_mena = (
     h6_df[h6_df['country'].isin(MENA_CONFLICT + MENA_STABLE)]
     .sort_values('pct_vs_baseline')
 )
-sub_colors2 = ['#E91E63' if c in MENA_CONFLICT else '#00BCD4'
-                for c in within_mena['country']]
+sub_colors2 = [MENA_CONFLICT_COLOR if c in MENA_CONFLICT else MENA_STABLE_COLOR
+               for c in within_mena['country']]
 
 bars2 = ax2.barh(within_mena['country'], within_mena['pct_vs_baseline'],
-                 color=sub_colors2, edgecolor='white', lw=0.8, alpha=0.85)
+                 color=sub_colors2, edgecolor='white', lw=0.8, alpha=0.90)
 ax2.axvline(0, color='black', lw=1.2)
 ax2.set_xlabel('% vs 2017-19 Baseline')
 
 for bar, val in zip(bars2, within_mena['pct_vs_baseline']):
-    ax2.text(val + (1.5 if val >= 0 else -1.5),
+    ax2.text(val + (2 if val >= 0 else -2),
              bar.get_y() + bar.get_height() / 2,
              f'{val:+.0f}%', va='center',
              ha='left' if val >= 0 else 'right', fontsize=9)
 
-conflict_patch = mpatches.Patch(color='#E91E63', label=f'Conflict-affected (mean {mena_conflict_vals.mean():+.0f}%)')
-stable_patch   = mpatches.Patch(color='#00BCD4', label=f'Stable: UAE, Qatar (mean {mena_stable_vals.mean():+.0f}%)')
+conflict_patch = mpatches.Patch(color=MENA_CONFLICT_COLOR,
+                                 label=f'Conflict-affected (n={len(mena_conflict_vals)}, '
+                                       f'mean {mena_conflict_vals.mean():+.0f}%)')
+stable_patch   = mpatches.Patch(color=MENA_STABLE_COLOR,
+                                 label=f'Stable — UAE, Qatar (n={len(mena_stable_vals)}, '
+                                       f'mean {mena_stable_vals.mean():+.0f}%)')
 ax2.legend(handles=[conflict_patch, stable_patch], fontsize=8, loc='lower right')
 ax2.set_title(
     "Within-MENA — DESCRIPTIVE ONLY\n"
@@ -829,7 +906,7 @@ ax2.set_title(
     fontsize=9
 )
 
-# Finding-driven title (omnibus on the formal test)
+# Finding-driven title (omnibus on the formal test; no y=1.01 which clips with tight layout)
 if h6_result['significant']:
     if mena_h6.mean() < nonmena_h6.mean():
         fig6_title = (
@@ -847,7 +924,7 @@ else:
         f"({h6_result['stat_label']}, p={h6_result['main_p']:.3f})"
     )
 
-fig.suptitle(fig6_title, fontweight='bold', fontsize=11, y=1.01)
+fig.suptitle(fig6_title, fontweight='bold', fontsize=11)
 plt.tight_layout()
 plt.savefig(FIGURES_DIR / 'fig6_h6_mena_tension_recent.png', dpi=150, bbox_inches='tight')
 plt.close()
