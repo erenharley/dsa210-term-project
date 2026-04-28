@@ -166,6 +166,14 @@ def classify(c):
 
 df['market_group'] = df['country'].map(classify)
 
+# MENA subgroup flags for H6 within-MENA descriptive split.
+# MENA-stable: UAE and Qatar — no major bilateral shocks with Turkey 2003-2025.
+# MENA-conflict-affected: Iran, Iraq, Israel, Syria — home-country instability or sanctions.
+# These flags are used in 02_eda_and_hypothesis.py for narrative comparison only
+# (n=2 in stable subgroup is too small for a formal test).
+df['is_mena_stable']   = df['country'].isin(['United Arab Emirates', 'Qatar']).astype(int)
+df['is_mena_conflict'] = df['country'].isin(['Iran', 'Iraq', 'Israel', 'Syria']).astype(int)
+
 print(f"\nFinal panel: {df.shape}")
 print(f"Columns: {df.columns.tolist()}")
 print(f"\nMissing values:\n{df.isnull().sum()[df.isnull().sum() > 0]}")
