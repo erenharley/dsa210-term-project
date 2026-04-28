@@ -29,6 +29,8 @@ IMF_COUNTRIES = {
     'ISR': 'Israel',
     'IRQ': 'Iraq',
     'SYR': 'Syria',
+    'ARE': 'United Arab Emirates',
+    'QAT': 'Qatar',
 }
 
 WB_COUNTRIES = {
@@ -47,6 +49,8 @@ WB_COUNTRIES = {
     'ISR': 'Israel',
     'IRQ': 'Iraq',
     'SYR': 'Syria',
+    'ARE': 'United Arab Emirates',
+    'QAT': 'Qatar',
 }
 
 # Turkey — destination country, fetched separately

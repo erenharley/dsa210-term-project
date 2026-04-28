@@ -1,401 +1,337 @@
 """
-DSA 210 - Tourism Demand Under Shock
-Diagnostic: Per-Country EDA (visitors + macro context)
-Author: Eren Sean Harley | 36054
+00_per_country_eda.py — Stage 1 diagnostic figures (do NOT modify other scripts).
 
-Outputs (all under images/per_country/):
-  _grid_visitors.png      — 4×4 grid, all 15 visitor trajectories
-  _turkey_macro.png       — Turkey-side macro indicators
-  <country>/overview.png  — per-country 5-panel figure
-
-Run AFTER 01_data_pipeline.py has been run (reads panel_dataset.csv as-is).
-Does NOT modify any other script, README, or CLAUDE.md.
+Outputs:
+  images/per_country/<country_slug>/overview.png  (one per country, 17 total)
+  images/per_country/_grid_visitors.png
+  images/per_country/_turkey_macro.png
 """
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import matplotlib.ticker as mticker
 from pathlib import Path
-import warnings
-warnings.filterwarnings('ignore')
 
-# ── Paths ──────────────────────────────────────────────────────────────────
-BASE_DIR     = Path(__file__).resolve().parent
-DATA_DIR     = BASE_DIR.parent / 'data'
-OUT_DIR      = BASE_DIR.parent / 'images' / 'per_country'
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import numpy as np
+import pandas as pd
+
+# ── Paths ───────────────────────────────────────────────────────────────────
+
+SCRIPT_DIR  = Path(__file__).resolve().parent
+REPO_ROOT   = SCRIPT_DIR.parent
+DATA_PATH   = REPO_ROOT / "data" / "panel_dataset.csv"
+OUT_DIR     = REPO_ROOT / "images" / "per_country"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── Load data ──────────────────────────────────────────────────────────────
-df = pd.read_csv(DATA_DIR / 'panel_dataset.csv')
-df = df.sort_values(['country', 'year']).reset_index(drop=True)
+# ── Group colors (must match 02_eda_and_hypothesis.py) ──────────────────────
 
-all_countries = sorted(df['country'].unique())
-
-# ── Market groups and colors (mirroring 02_eda_and_hypothesis.py) ──────────
 GROUP_COLORS = {
-    'Western Europe': '#2196F3',
-    'Eastern Europe': '#4CAF50',
-    'Former Soviet':  '#FF5722',
-    'MENA':           '#9C27B0',
-    'Other':          '#607D8B',
+    "Western Europe": "#2196F3",
+    "Eastern Europe": "#4CAF50",
+    "Former Soviet":  "#FF5722",
+    "MENA":           "#9C27B0",
+    "Other":          "#607D8B",
 }
+
+# ── Crisis bands ─────────────────────────────────────────────────────────────
+
+CRISES = [
+    {"label": "Syria conflict",          "start": 2011,    "end": 2015,    "color": "#E53935"},
+    {"label": "2016 coup",               "start": 2015.7,  "end": 2016.3,  "color": "#FB8C00"},
+    {"label": "COVID-19",                "start": 2020,    "end": 2021,    "color": "#1E88E5"},
+    {"label": "Russia–Ukraine war",      "start": 2022,    "end": 2023,    "color": "#FDD835"},
+    {"label": "Post-2023 MENA tensions", "start": 2023,    "end": 2025,    "color": "#8E24AA"},
+]
+
+# Crisis-edge marker years per crisis (visitors panel only); skip 2016 coup (narrow)
+CRISIS_EDGE_YEARS = {
+    "Syria conflict":          [2011, 2015],
+    "COVID-19":                [2020, 2021],
+    "Russia–Ukraine war":      [2022, 2023],
+    "Post-2023 MENA tensions": [2023, 2025],
+}
+
+# ── Country ordering for grid ────────────────────────────────────────────────
 
 COUNTRY_ORDER = [
     # Western Europe
-    'France', 'Germany', 'Netherlands', 'United Kingdom',
+    "France", "Germany", "Netherlands", "United Kingdom",
     # Eastern Europe
-    'Bulgaria', 'Greece', 'Ukraine',
+    "Bulgaria", "Greece", "Ukraine",
     # Former Soviet
-    'Azerbaijan', 'Georgia', 'Russia',
+    "Azerbaijan", "Georgia", "Russia",
     # MENA
-    'Iran', 'Iraq', 'Israel', 'Syria',
+    "Iran", "Iraq", "Israel", "Syria", "United Arab Emirates", "Qatar",
     # Other
-    'USA',
+    "USA",
 ]
 
-# ── Crisis windows ─────────────────────────────────────────────────────────
-CRISIS_WINDOWS = [
-    # start/end   = axvspan drawing coordinates (can be fractional)
-    # marker_s/e  = integer years of first/last affected data point (for hollow circles)
-    {'label': 'Syria conflict',          'start': 2011,   'end': 2015,   'marker_s': 2011, 'marker_e': 2015, 'color': '#E53935'},
-    {'label': '2016 coup',               'start': 2015.7, 'end': 2016.3, 'marker_s': 2016, 'marker_e': 2016, 'color': '#FB8C00'},
-    {'label': 'COVID-19',                'start': 2019,   'end': 2021,   'marker_s': 2019, 'marker_e': 2021, 'color': '#1E88E5'},
-    {'label': 'Russia–Ukraine war',      'start': 2022,   'end': 2022.5, 'marker_s': 2022, 'marker_e': 2022, 'color': '#FDD835'},
-    {'label': 'Post-2023 MENA tensions', 'start': 2023,   'end': 2025,   'marker_s': 2023, 'marker_e': 2024, 'color': '#8E24AA'},
-]
 
-# Crisis edge-marker windows (visitors panel only, skip 2016 coup narrow band)
-CRISIS_EDGE_WINDOWS = [c for c in CRISIS_WINDOWS if c['label'] != '2016 coup']
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+def add_crisis_bands(axes):
+    """Draw all crisis axvspan bands on a list (or single) Axes."""
+    if not hasattr(axes, "__iter__"):
+        axes = [axes]
+    for ax in axes:
+        for c in CRISES:
+            ax.axvspan(c["start"], c["end"], alpha=0.28, color=c["color"],
+                       zorder=0, linewidth=0)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────
-
-def get_group_color(country):
-    grp = df[df['country'] == country]['market_group'].iloc[0]
-    return GROUP_COLORS.get(grp, '#607D8B')
-
-
-def add_crisis_bands(ax):
-    """Draw all crisis bands on a given axes."""
-    for w in CRISIS_WINDOWS:
-        ax.axvspan(w['start'], w['end'], color=w['color'], alpha=0.28,
-                   linewidth=0, zorder=0)
+def format_millions(x, _=None):
+    if pd.isna(x):
+        return "N/A"
+    if x >= 1_000_000:
+        return f"{x/1_000_000:.1f}M"
+    if x >= 1_000:
+        return f"{x/1_000:.0f}K"
+    return str(int(x))
 
 
-def format_mean_visitors(val):
-    """Format mean visitors as e.g. '4.2M', '850K', '12K'."""
-    if val >= 1_000_000:
-        return f"{val / 1_000_000:.1f}M"
-    elif val >= 1_000:
-        return f"{val / 1_000:.0f}K"
-    else:
-        return f"{val:.0f}"
+def crisis_legend_patches():
+    return [mpatches.Patch(color=c["color"], alpha=0.55, label=c["label"])
+            for c in CRISES]
 
 
-def thousands_formatter(x, pos):
-    return f'{x:,.0f}'
+def style_ax(ax, zero_line=False):
+    """Apply shared panel styling."""
+    ax.set_facecolor("#fafafa")
+    ax.grid(axis="both", color="#cccccc", alpha=0.4, zorder=-1, linewidth=0.7)
+    ax.tick_params(labelsize=8)
+    if zero_line:
+        ax.axhline(0, color="#888888", lw=0.8, ls="--", zorder=1)
 
 
-def make_crisis_legend_handles():
-    return [
-        mpatches.Patch(facecolor=w['color'], alpha=0.55, label=w['label'])
-        for w in CRISIS_WINDOWS
+def slug(country_name):
+    return country_name.lower().replace(" ", "-")
+
+
+def format_stat(val):
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return "N/A"
+    return f"{val:,.0f}"
+
+
+# ── Load data ─────────────────────────────────────────────────────────────────
+
+df = pd.read_csv(DATA_PATH)
+
+# Build country → group mapping
+group_map = (df[["country", "market_group"]]
+             .drop_duplicates()
+             .set_index("country")["market_group"]
+             .to_dict())
+
+countries = sorted(df["country"].unique())
+assert len(countries) == 17, f"Expected 17 countries, got {len(countries)}: {countries}"
+
+
+# ── Per-country overview pages ────────────────────────────────────────────────
+
+for country in countries:
+    cdf = df[df["country"] == country].sort_values("year").copy()
+    group = group_map[country]
+    color = GROUP_COLORS[group]
+
+    fig, axes = plt.subplots(5, 1, sharex=True,
+                             figsize=(11, 16),
+                             gridspec_kw={"hspace": 0.35},
+                             facecolor="white")
+
+    panels = [
+        ("Visitors",            "visitors",            "Visitors (annual)",        False),
+        ("GDP growth",          "gdp_growth",          "GDP growth (% YoY)",       True),
+        ("GDP per capita",      "gdp_per_capita",      "GDP per capita (USD)",     False),
+        ("Inflation",           "inflation",           "Inflation (% CPI)",        False),
+        ("Political stability", "political_stability", "WGI Political Stability",  True),
     ]
 
+    add_crisis_bands(axes)
 
-# ── Global rcParams ────────────────────────────────────────────────────────
-plt.rcParams.update({
-    'figure.facecolor': 'white',
-    'font.family':      'DejaVu Sans',
-    'font.size':        10,
-    'axes.titlesize':   10,
-    'axes.labelsize':   9,
-    'legend.fontsize':  9,
-    'xtick.labelsize':  8,
-    'ytick.labelsize':  8,
-})
+    for ax, (panel_name, col, ylabel, zero_line) in zip(axes, panels):
+        style_ax(ax, zero_line=zero_line)
+        ax.set_ylabel(ylabel, fontsize=8)
+        ax.set_title(panel_name, fontsize=10, fontweight="bold", loc="left")
 
-PANEL_FACECOLOR = '#fafafa'
-GRID_COLOR      = '#cccccc'
-GRID_ALPHA      = 0.4
+        sub = cdf[["year", col]].dropna()
+        if not sub.empty:
+            ax.plot(sub["year"], sub[col],
+                    color=color, lw=2.0, marker="o", ms=5,
+                    mec="white", mew=0.8, zorder=3)
 
+        # Crisis-edge markers on visitors panel only
+        if panel_name == "Visitors":
+            ax.yaxis.set_major_formatter(
+                mticker.FuncFormatter(lambda x, _: format_millions(x)))
+            for crisis_name, edge_years in CRISIS_EDGE_YEARS.items():
+                c_color = next(c["color"] for c in CRISES if c["label"] == crisis_name)
+                for ey in edge_years:
+                    row = sub[sub["year"] == ey]
+                    if not row.empty:
+                        ax.plot(row["year"].values, row[col].values,
+                                marker="o", ms=10, mfc="none",
+                                mec=c_color, mew=2, zorder=4, linestyle="none")
+        elif panel_name == "GDP per capita":
+            ax.yaxis.set_major_formatter(
+                mticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
 
-# ══════════════════════════════════════════════════════════════════════════
-#  1. PER-COUNTRY OVERVIEW FIGURES
-# ══════════════════════════════════════════════════════════════════════════
-
-PANEL_SPECS = [
-    # (column,             ylabel,                         axhline_zero)
-    ('visitors',           'Visitors (annual)',             False),
-    ('gdp_growth',         'GDP growth (% YoY)',            True),
-    ('gdp_per_capita',     'GDP per capita (USD)',          False),
-    ('inflation',          'Inflation (% CPI)',             False),
-    ('political_stability','WGI Political Stability',       True),
-]
-
-PANEL_TITLES = ['Visitors', 'GDP growth', 'GDP per capita', 'Inflation', 'Political stability']
-
-for country in all_countries:
-    cdf = df[df['country'] == country].sort_values('year')
-    years = cdf['year'].values
-    color = get_group_color(country)
-    slug = country.lower().replace(' ', '-')
-
-    fig, axes = plt.subplots(5, 1, figsize=(11, 16), sharex=True,
-                              gridspec_kw={'hspace': 0.35},
-                              facecolor='white')
-
-    for i, (col, ylabel, zero_line) in enumerate(PANEL_SPECS):
-        ax = axes[i]
-        ax.set_facecolor(PANEL_FACECOLOR)
-        ax.grid(True, color=GRID_COLOR, alpha=GRID_ALPHA, linewidth=0.8, zorder=-1)
-
-        # Crisis bands first (zorder=0)
-        add_crisis_bands(ax)
-
-        # Zero reference line for signed panels
-        if zero_line:
-            ax.axhline(0, color='#888888', lw=0.8, ls='--', zorder=1)
-
-        # Data
-        y = cdf[col].values.astype(float)
-        mask = ~np.isnan(y)
-        ax.plot(years[mask], y[mask],
-                lw=2.0, color=color, marker='o', ms=5,
-                mec='white', mew=0.8, zorder=3)
-
-        # Crisis edge markers on the visitors panel only
-        if i == 0:
-            for w in CRISIS_EDGE_WINDOWS:
-                for edge_year in [w['marker_s'], w['marker_e']]:
-                    idx = np.where(years == edge_year)[0]
-                    if len(idx) and not np.isnan(y[idx[0]]):
-                        ax.plot(edge_year, y[idx[0]],
-                                marker='o', ms=10, mfc='none',
-                                mew=2, color=w['color'], zorder=4)
-
-        # Y-axis formatting
-        if col in ('visitors', 'gdp_per_capita'):
-            ax.yaxis.set_major_formatter(mticker.FuncFormatter(thousands_formatter))
-
-        # Explicit y-axis limits based on this country's actual data range
-        valid_y = y[mask]
-        if len(valid_y) > 0:
-            lo, hi = valid_y.min(), valid_y.max()
-            pad = (hi - lo) * 0.10 if hi != lo else abs(hi) * 0.10 or 1
-            # Visitors and counts never go below 0
-            if col in ('visitors', 'gdp_per_capita'):
-                ax.set_ylim(max(0, lo - pad), hi + pad)
-            else:
-                ax.set_ylim(lo - pad, hi + pad)
-
-        # Panel title (bold, left-aligned, small)
-        ax.set_title(PANEL_TITLES[i], fontsize=10, fontweight='bold',
-                     loc='left', pad=3)
-        ax.set_ylabel(ylabel, fontsize=9)
-
-        ax.set_xlim(2002.5, 2025.5)
-
-    # X-axis ticks (bottom panel only, shared)
+    # X-axis ticks on bottom panel only (sharex=True)
+    axes[-1].set_xlabel("Year", fontsize=9)
     axes[-1].set_xticks(range(2003, 2026, 2))
-    axes[-1].set_xlabel('Year', fontsize=9)
+    axes[-1].set_xlim(2002.5, 2025.5)
 
-    # Suptitle and subtitle
-    fig.suptitle(f'{country} — Visitors and Macro Context (2003–2025)',
-                 fontsize=15, fontweight='bold', y=0.995)
+    # Suptitle + subtitle
+    fig.suptitle(f"{country} — Visitors and Macro Context (2003–2025)",
+                 fontsize=15, fontweight="bold", y=0.995)
     fig.text(0.5, 0.978,
-             'Source: TÜİK (visitors), IMF DataMapper (GDP, inflation), '
-             'World Bank Data360 (political stability) | Crisis windows shaded',
-             fontsize=9, color='#555555', ha='center')
+             "Source: TÜİK (visitors), IMF DataMapper (GDP, inflation), "
+             "World Bank Data360 (political stability) | Crisis windows shaded",
+             fontsize=9, color="#555555", ha="center")
 
-    # Shared legend at bottom
-    handles = make_crisis_legend_handles()
-    fig.legend(handles=handles, loc='lower center',
-               bbox_to_anchor=(0.5, -0.005), ncol=5, fontsize=9,
-               framealpha=0.9, edgecolor='#cccccc')
+    # Shared legend
+    fig.legend(handles=crisis_legend_patches(),
+               loc="lower center", bbox_to_anchor=(0.5, -0.005),
+               ncol=5, fontsize=9, framealpha=0.9)
 
     # Save
-    out_path = OUT_DIR / f'{slug}.png'
-    fig.savefig(out_path, dpi=150, bbox_inches='tight', facecolor='white')
+    out_path = OUT_DIR / slug(country)
+    out_path.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path / "overview.png", dpi=150, bbox_inches="tight",
+                facecolor="white")
     plt.close(fig)
 
     # Console summary
-    vis = cdf['visitors'].values.astype(float)
-    vis_valid = vis[~np.isnan(vis)]
-    vis_years = years[~np.isnan(vis)]
+    vis = cdf["visitors"].dropna()
+    min_idx = vis.idxmin() if not vis.empty else None
+    max_idx = vis.idxmax() if not vis.empty else None
+    min_year = int(cdf.loc[min_idx, "year"]) if min_idx is not None else "N/A"
+    max_year = int(cdf.loc[max_idx, "year"]) if max_idx is not None else "N/A"
+    min_val  = cdf.loc[min_idx, "visitors"] if min_idx is not None else None
+    max_val  = cdf.loc[max_idx, "visitors"] if max_idx is not None else None
 
-    mean_v = vis_valid.mean() if len(vis_valid) else float('nan')
-    min_idx = int(np.argmin(vis_valid)) if len(vis_valid) else None
-    max_idx = int(np.argmax(vis_valid)) if len(vis_valid) else None
+    v2019 = cdf.loc[cdf["year"] == 2019, "visitors"].values
+    v2020 = cdf.loc[cdf["year"] == 2020, "visitors"].values
+    v2024 = cdf.loc[cdf["year"] == 2024, "visitors"].values
 
-    def _get_year_val(yr):
-        row = cdf[cdf['year'] == yr]['visitors']
-        return f"{int(row.values[0]):,}" if len(row) and not np.isnan(row.values[0]) else 'N/A'
-
-    macro_nan_cols = []
-    for col in ('gdp_growth', 'gdp_per_capita', 'inflation', 'political_stability'):
-        if cdf[col].isna().any():
-            macro_nan_cols.append(col)
+    nan_cols = [c for c in ["gdp_growth", "gdp_per_capita", "inflation", "political_stability"]
+                if cdf[c].isna().any()]
 
     print(
-        f"{country:20s} | visitors mean={mean_v:>12,.0f} "
-        f"| min={vis_years[min_idx]}:{vis_valid[min_idx]:>12,.0f} "
-        f"| max={vis_years[max_idx]}:{vis_valid[max_idx]:>12,.0f} "
-        f"| 2019={_get_year_val(2019):>12s} "
-        f"| 2020={_get_year_val(2020):>12s} "
-        f"| 2024={_get_year_val(2024):>12s} "
-        f"| macro NaN cols: {macro_nan_cols}"
+        f"{country} | "
+        f"visitors mean={vis.mean():,.0f} | "
+        f"min={min_year}:{format_stat(min_val)} | "
+        f"max={max_year}:{format_stat(max_val)} | "
+        f"2019={format_stat(v2019[0] if len(v2019) else None)} | "
+        f"2020={format_stat(v2020[0] if len(v2020) else None)} | "
+        f"2024={format_stat(v2024[0] if len(v2024) else None)} | "
+        f"macro NaN cols: {nan_cols}"
     )
 
 
-# ══════════════════════════════════════════════════════════════════════════
-#  2. _grid_visitors.png — 4×4 grid of all 15 visitor trajectories
-# ══════════════════════════════════════════════════════════════════════════
+# ── Turkey macro page ─────────────────────────────────────────────────────────
 
-fig_grid, axes_grid = plt.subplots(4, 4, figsize=(20, 16), facecolor='white')
-axes_flat = axes_grid.flatten()
+turkey_cols = ["year", "tur_gdp_growth", "tur_gdp_per_capita", "tur_inflation", "tur_ppp_rate"]
+tdf = (df[turkey_cols]
+       .drop_duplicates(subset="year")
+       .sort_values("year"))
+
+# Turkey NaN report
+for col in ["tur_gdp_growth", "tur_gdp_per_capita", "tur_inflation", "tur_ppp_rate"]:
+    nan_years = tdf.loc[tdf[col].isna(), "year"].tolist()
+    print(f"Turkey macro | {col} NaN years: {nan_years}")
+
+fig, axes = plt.subplots(4, 1, sharex=True,
+                         figsize=(11, 13),
+                         gridspec_kw={"hspace": 0.35},
+                         facecolor="white")
+
+tur_panels = [
+    ("Turkey GDP growth",     "tur_gdp_growth",     "Turkey GDP growth (% YoY)",              True),
+    ("Turkey GDP per capita", "tur_gdp_per_capita", "Turkey GDP per capita (USD)",            False),
+    ("Turkey inflation",      "tur_inflation",      "Turkey inflation (% CPI)",               False),
+    ("Turkey PPP rate",       "tur_ppp_rate",       "Turkey PPP rate (higher = weaker lira)", False),
+]
+
+TUR_COLOR = "#C62828"
+add_crisis_bands(axes)
+
+for ax, (panel_name, col, ylabel, zero_line) in zip(axes, tur_panels):
+    style_ax(ax, zero_line=zero_line)
+    ax.set_ylabel(ylabel, fontsize=8)
+    ax.set_title(panel_name, fontsize=10, fontweight="bold", loc="left")
+    sub = tdf[["year", col]].dropna()
+    if not sub.empty:
+        ax.plot(sub["year"], sub[col],
+                color=TUR_COLOR, lw=2.0, marker="o", ms=5,
+                mec="white", mew=0.8, zorder=3)
+
+axes[-1].set_xlabel("Year", fontsize=9)
+axes[-1].set_xticks(range(2003, 2026, 2))
+axes[-1].set_xlim(2002.5, 2025.5)
+
+fig.suptitle("Turkey — Macroeconomic Indicators (2003–2025)",
+             fontsize=15, fontweight="bold", y=0.995)
+fig.text(0.5, 0.978,
+         "Source: IMF DataMapper | Crisis windows shaded",
+         fontsize=9, color="#555555", ha="center")
+fig.legend(handles=crisis_legend_patches(),
+           loc="lower center", bbox_to_anchor=(0.5, -0.005),
+           ncol=5, fontsize=9, framealpha=0.9)
+
+fig.savefig(OUT_DIR / "_turkey_macro.png", dpi=150, bbox_inches="tight",
+            facecolor="white")
+plt.close(fig)
+
+
+# ── Grid visitors page ────────────────────────────────────────────────────────
+
+fig, axes = plt.subplots(5, 4, figsize=(20, 20),
+                         facecolor="white",
+                         gridspec_kw={"hspace": 0.45, "wspace": 0.3})
+axes_flat = axes.flatten()
 
 for i, country in enumerate(COUNTRY_ORDER):
     ax = axes_flat[i]
-    cdf = df[df['country'] == country].sort_values('year')
-    years = cdf['year'].values
-    vis = cdf['visitors'].values.astype(float)
-    color = get_group_color(country)
+    cdf = df[df["country"] == country].sort_values("year")
+    group = group_map[country]
+    color = GROUP_COLORS[group]
 
-    ax.set_facecolor(PANEL_FACECOLOR)
-    ax.grid(True, color=GRID_COLOR, alpha=GRID_ALPHA, linewidth=0.8, zorder=-1)
     add_crisis_bands(ax)
+    style_ax(ax)
 
-    mask = ~np.isnan(vis)
-    ax.plot(years[mask], vis[mask],
-            lw=1.8, color=color, marker='o', ms=4,
-            mec='white', mew=0.6, zorder=3)
+    sub = cdf[["year", "visitors"]].dropna()
+    if not sub.empty:
+        ax.plot(sub["year"], sub["visitors"],
+                color=color, lw=1.8, marker="o", ms=4,
+                mec="white", mew=0.6, zorder=3)
 
-    ax.set_title(country, fontsize=11, fontweight='bold')
+    ax.set_title(country, fontsize=11, fontweight="bold")
     ax.set_xticks(range(2003, 2026, 4))
-    ax.tick_params(axis='x', labelsize=7, rotation=45)
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(thousands_formatter))
-    ax.tick_params(axis='y', labelsize=7)
+    ax.tick_params(labelsize=7)
+    ax.yaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, _: format_millions(x)))
     ax.set_xlim(2002.5, 2025.5)
 
-    # Explicit y-limits per country so Iran and UK don't look the same scale
-    valid_vis = vis[mask]
-    if len(valid_vis) > 0:
-        lo, hi = valid_vis.min(), valid_vis.max()
-        pad = (hi - lo) * 0.10 if hi != lo else hi * 0.10 or 1
-        ax.set_ylim(max(0, lo - pad), hi + pad)
+    # Mean annotation
+    mean_val = sub["visitors"].mean() if not sub.empty else np.nan
+    ax.text(0.97, 0.95, f"μ: {format_millions(mean_val)}",
+            transform=ax.transAxes, fontsize=8,
+            ha="right", va="top",
+            bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.75, ec="none"))
 
-    # Mean annotation top-right
-    mean_v = vis[mask].mean() if mask.sum() else float('nan')
-    ax.text(0.97, 0.95, f'μ: {format_mean_visitors(mean_v)}',
-            transform=ax.transAxes, ha='right', va='top', fontsize=8,
-            bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
-                      alpha=0.75, edgecolor='none'))
+# Hide the 3 unused cells (17 countries in a 5×4 = 20-cell grid)
+for j in range(len(COUNTRY_ORDER), len(axes_flat)):
+    axes_flat[j].set_visible(False)
 
-# Hide unused 16th cell
-axes_flat[15].set_visible(False)
+fig.suptitle("Per-Country Visitor Trajectories with Crisis Windows (2003–2025)",
+             fontsize=15, fontweight="bold", y=1.002)
+fig.legend(handles=crisis_legend_patches(),
+           loc="lower center", bbox_to_anchor=(0.5, -0.012),
+           ncol=5, fontsize=10, framealpha=0.9)
 
-# Suptitle
-fig_grid.suptitle('Per-Country Visitor Trajectories with Crisis Windows (2003–2025)',
-                  fontsize=15, fontweight='bold', y=1.002)
+fig.savefig(OUT_DIR / "_grid_visitors.png", dpi=150, bbox_inches="tight",
+            facecolor="white")
+plt.close(fig)
 
-# Shared legend at bottom
-handles = make_crisis_legend_handles()
-fig_grid.legend(handles=handles, loc='lower center',
-                bbox_to_anchor=(0.5, -0.012), ncol=5, fontsize=9,
-                framealpha=0.9, edgecolor='#cccccc')
-
-fig_grid.tight_layout()
-grid_path = OUT_DIR / '_grid_visitors.png'
-fig_grid.savefig(grid_path, dpi=150, bbox_inches='tight', facecolor='white')
-plt.close(fig_grid)
-
-
-# ══════════════════════════════════════════════════════════════════════════
-#  3. _turkey_macro.png — Turkey-side macro indicators
-# ══════════════════════════════════════════════════════════════════════════
-
-tur_cols = ['year', 'tur_gdp_growth', 'tur_gdp_per_capita', 'tur_inflation', 'tur_ppp_rate']
-tur_df = (
-    df[tur_cols]
-    .drop_duplicates(subset='year')
-    .sort_values('year')
-    .reset_index(drop=True)
-)
-
-TUR_PANEL_SPECS = [
-    ('tur_gdp_growth',     'Turkey GDP growth (% YoY)',         True),
-    ('tur_gdp_per_capita', 'Turkey GDP per capita (USD)',        False),
-    ('tur_inflation',      'Turkey inflation (% CPI)',           False),
-    ('tur_ppp_rate',       'Turkey PPP rate (higher = weaker ₺)',False),
-]
-TUR_PANEL_TITLES = [
-    'Turkey GDP growth',
-    'Turkey GDP per capita',
-    'Turkey inflation',
-    'Turkey PPP rate (lira weakness proxy)',
-]
-TUR_COLOR = '#C62828'  # Turkish red
-
-fig_tur, axes_tur = plt.subplots(4, 1, figsize=(11, 13), sharex=True,
-                                   gridspec_kw={'hspace': 0.35},
-                                   facecolor='white')
-
-years_tur = tur_df['year'].values
-
-for i, (col, ylabel, zero_line) in enumerate(TUR_PANEL_SPECS):
-    ax = axes_tur[i]
-    ax.set_facecolor(PANEL_FACECOLOR)
-    ax.grid(True, color=GRID_COLOR, alpha=GRID_ALPHA, linewidth=0.8, zorder=-1)
-    add_crisis_bands(ax)
-
-    if zero_line:
-        ax.axhline(0, color='#888888', lw=0.8, ls='--', zorder=1)
-
-    y = tur_df[col].values.astype(float)
-    mask = ~np.isnan(y)
-    ax.plot(years_tur[mask], y[mask],
-            lw=2.0, color=TUR_COLOR, marker='o', ms=5,
-            mec='white', mew=0.8, zorder=3)
-
-    if col == 'tur_gdp_per_capita':
-        ax.yaxis.set_major_formatter(mticker.FuncFormatter(thousands_formatter))
-
-    ax.set_title(TUR_PANEL_TITLES[i], fontsize=10, fontweight='bold',
-                 loc='left', pad=3)
-    ax.set_ylabel(ylabel, fontsize=9)
-    ax.set_xlim(2002.5, 2025.5)
-
-axes_tur[-1].set_xticks(range(2003, 2026, 2))
-axes_tur[-1].set_xlabel('Year', fontsize=9)
-
-fig_tur.suptitle('Turkey — Macroeconomic Indicators (2003–2025)',
-                 fontsize=15, fontweight='bold', y=0.995)
-fig_tur.text(0.5, 0.978,
-             'Source: IMF DataMapper | Crisis windows shaded',
-             fontsize=9, color='#555555', ha='center')
-
-handles = make_crisis_legend_handles()
-fig_tur.legend(handles=handles, loc='lower center',
-               bbox_to_anchor=(0.5, -0.005), ncol=5, fontsize=9,
-               framealpha=0.9, edgecolor='#cccccc')
-
-tur_path = OUT_DIR / '_turkey_macro.png'
-fig_tur.savefig(tur_path, dpi=150, bbox_inches='tight', facecolor='white')
-plt.close(fig_tur)
-
-# ── Turkey NaN report ─────────────────────────────────────────────────────
-tur_nan_parts = []
-for col in ['tur_gdp_growth', 'tur_gdp_per_capita', 'tur_inflation', 'tur_ppp_rate']:
-    nan_years = tur_df[tur_df[col].isna()]['year'].tolist()
-    if nan_years:
-        tur_nan_parts.append(f"{col} NaN years: {nan_years}")
-if tur_nan_parts:
-    print("Turkey macro | " + " | ".join(tur_nan_parts))
-else:
-    print("Turkey macro | no NaN years in any column")
-
-print(f"\nWrote 15 country overviews + _grid_visitors.png + _turkey_macro.png "
-      f"to images/per_country/")
+print(f"\nWrote 17 country overviews + _grid_visitors.png + _turkey_macro.png to {OUT_DIR}")
