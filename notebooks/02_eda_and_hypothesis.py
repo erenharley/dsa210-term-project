@@ -221,7 +221,7 @@ else:
 
 ax.set_title(fig1_title, fontweight='bold', pad=12)
 plt.tight_layout()
-plt.savefig(FIGURES_DIR / 'fig1_h1_coup_sensitivity.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'h1_coup_sensitivity.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 1 saved")
 
@@ -381,7 +381,7 @@ else:
 
 fig.suptitle(fig2_title, fontweight='bold', fontsize=11)
 plt.tight_layout()
-plt.savefig(FIGURES_DIR / 'fig2_h2_syria_mena.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'h2_syria_proximity.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 2 saved")
 
@@ -522,7 +522,7 @@ else:
 
 fig.suptitle(fig3_title, fontweight='bold', fontsize=11)
 plt.tight_layout()
-plt.savefig(FIGURES_DIR / 'fig3_h3_covid_recovery.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'h3_covid_recovery.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 3 saved")
 
@@ -658,7 +658,7 @@ else:
 
 ax.set_title(fig4_title, fontweight='bold', pad=10, wrap=True)
 plt.tight_layout()
-plt.savefig(FIGURES_DIR / 'fig4_h4_lira_weakness.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'h4_lira_weakness.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 4 saved")
 
@@ -768,7 +768,7 @@ else:
 
 ax.set_title(fig5_title, fontweight='bold', pad=10, wrap=True)
 plt.tight_layout()
-plt.savefig(FIGURES_DIR / 'fig5_h5_gdp_visitors.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'h5_gdp_visitors.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 5 saved")
 
@@ -926,7 +926,7 @@ else:
 
 fig.suptitle(fig6_title, fontweight='bold', fontsize=11)
 plt.tight_layout()
-plt.savefig(FIGURES_DIR / 'fig6_h6_mena_tension_recent.png', dpi=150, bbox_inches='tight')
+plt.savefig(FIGURES_DIR / 'h6_mena_tension_recent.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Fig 6 saved")
 
