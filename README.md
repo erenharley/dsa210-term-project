@@ -105,7 +105,15 @@ python notebooks/02_eda_and_hypothesis.py
 
 Reads `data/panel_dataset.csv`, runs H1–H6, writes `images/h1_*.png` … `images/h6_*.png`, and prints all test results to stdout.
 
-### 5. Generate perspective EDA figures
+### 5. Run ML models (Phase 4)
+
+```bash
+python notebooks/04_ml_models.py
+```
+
+Reads `data/panel_dataset.csv`, applies imputation, and produces `images/ml_01_*.png` … `images/ml_06_*.png`. Prints all metrics to stdout.
+
+### 6. Generate perspective EDA figures
 
 ```bash
 python notebooks/03_perspective_eda.py
@@ -113,7 +121,7 @@ python notebooks/03_perspective_eda.py
 
 Writes `images/eda_01_*.png` … `images/eda_05_*.png` (trends by group, shock sensitivity, recovery speed, political stability, resilience heatmap).
 
-### 6. (Optional) Open the interactive notebook
+### 7. (Optional) Open the interactive notebook
 
 ```bash
 jupyter lab notebooks/project_analysis.ipynb
@@ -128,14 +136,10 @@ statistically significant findings are stated as findings; non-significant
 results are reported as descriptive observations.
 
 **Statistically significant (α = 0.05):**
-- Turkey lira weakness (YoY % change in PPP rate) correlates strongly with *larger*
-  visitor drops during shock years — Pearson r = −0.80, p < 0.001 (H4). The crisis
-  and instability effect dominates the naive "cheap Turkey = more tourists" price
-  signal. Note: correlation is driven by only 3 distinct shock years (2009, 2016,
-  2020) — reflects year-level differences, not a continuous lira-visitor relationship.
-- Source country GDP per capita shows a significant aggregate Spearman correlation
-  with visitor volume (H5), but within-group directions diverge (MENA: r = −0.62;
-  Former Soviet: r = +0.72), suggesting a potential Simpson's paradox.
+- Turkey lira weakness (YoY % change in PPP rate) correlates with larger visitor
+  drops during shock years — Pearson r = −0.80, p < 0.001 (H4). Note: the
+  correlation is driven by only 3 distinct shock years (2009, 2016, 2020) — it
+  reflects year-level differences, not a continuous lira-visitor relationship.
 
 **Descriptive (not statistically significant at α = 0.05):**
 - Market groups did not differ significantly in 2016 coup sensitivity
@@ -156,6 +160,59 @@ results are reported as descriptive observations.
 - Iraq visitor counts grew +160% during the Syria war period (2011–15 vs 2008–10
   baseline), which masked any aggregate proximity suppression effect in H2
   (independent t = −0.21, p = 0.84; Syria-bordering mean +37% vs non-bordering +48%).
+- Aggregate Spearman correlation between source country GDP per capita and visitor
+  volume is not significant (Spearman r = −0.07, p = 0.17; H5), though within-group
+  patterns diverge strongly: Former Soviet r = +0.72 (p < 0.001), MENA r = −0.62
+  (p < 0.001), suggesting a Simpson's paradox — wealthier MENA markets send fewer
+  tourists (conflict suppression), while wealthier Former Soviet markets send more.
+
+---
+
+## Phase 4 — ML Methods
+
+Script: `python notebooks/04_ml_models.py`
+
+Outputs: `images/ml_01_*.png` … `images/ml_06_*.png`
+
+**Section 1 — Linear Regression (log_visitors; temporal split train <= 2019, test 2020-2025)**
+Train R² = 0.705, Test R² = -3.24. The model fits pre-COVID visitor patterns reasonably well
+(~70% variance explained in training) but fails to generalize to 2020-2025: COVID, the
+Russia-Ukraine war, and rising MENA tensions are structurally unlike anything in the training
+window. This is the expected and honest outcome of the temporal split — do not tune to improve
+test R². Residual plot (`ml_01`) and predicted-vs-actual (`ml_02`) show systematic
+under-prediction during COVID and over-prediction in the recovery. Key finding: shock dummies
+whose events fall after 2019 (`covid`, `russia_ukraine_war`, `mena_tension_recent`) receive
+near-zero coefficients because they have zero variance in training — a model trained before
+a shock cannot learn that shock's coefficient.
+
+**Section 2 — Classification: COVID-resilient vs non-resilient (LOOCV, n=17)**
+Label: 1 if 2022 visitors >= 2019 visitors (9 resilient / 8 non-resilient). Features use
+pre-2020 data only (2015-2019 macro averages, log baseline visitors, market group, MENA flags).
+Logistic Regression LOOCV accuracy = 0.65; Random Forest = 0.71. Feature importance
+(`ml_03`) shows log baseline market size and political stability as most informative.
+ROC AUC is approximate given n=17 LOOCV points. All results are descriptive/exploratory
+— n=17 is too small to claim statistical superiority of one model over another.
+
+**Section 3 — Clustering: k-means (k=3) + hierarchical dendrogram**
+Per-country feature vector: 2016 coup drop, 2020 COVID drop, 2023-25 % vs 2017-19 baseline,
+post-COVID recovery years (capped at 5), log mean baseline visitors. Elbow plot (`ml_04`)
+supports k=3. Cluster 0 (UAE, USA): fast recovery, strong 2023-25 gains. Cluster 1 (Western
+Europe, Iran, Israel, Ukraine, Bulgaria): moderate COVID drop, recovered by 2022, moderate
+post-2023 gains. Cluster 2 (Former Soviet, Greece, Iraq, Qatar, Syria): high coup sensitivity,
+slow COVID recovery (mean 4.7 years), subdued 2023-25 performance. Critically, UAE separates
+from conflict-affected MENA markets (Iraq, Syria, Qatar) — the hierarchical dendrogram
+(`ml_05`) confirms this split. This aligns with the H6 within-MENA descriptive evidence:
+Gulf-stable markets have a categorically different shock-response profile.
+
+**Section 4 — Scenario 2026 (extending Section 1)**
+Holds each country's macro features at their 2025 values with `mena_tension_recent=1`
+and all other shocks off. Because `mena_tension_recent` has a near-zero coefficient (zero
+variance in training), this scenario is equivalent to asking: "what does the pre-2020 model
+expect from 2025 macro conditions?" The predictions are driven by the GDP per capita and
+market group coefficients, not by the MENA tension variable — an honest limitation of
+the temporal split. Bar chart (`ml_06`) shows the structural gap between the model's
+pre-COVID expectations and 2025 actual visitor levels. The scenario confirms the linear
+regression cannot serve as a MENA-tension forecaster without post-2023 training data.
 
 ---
 

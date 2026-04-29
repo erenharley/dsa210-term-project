@@ -33,8 +33,8 @@ Goal #3 is the headline of the proposal and must be addressed by at least one hy
 - [x] Phase 3 redesign Stage 1 — 00_per_country_eda.py; 17 country overview pages + grid + turkey macro
 - [x] Phase 3 redesign Stage 2 — 02_eda_and_hypothesis.py lecture-aligned tests H1–H6; finding-driven figures
 - [x] Phase 3 redesign Stage 2.5 — figure consolidation: 6 h* renames, 5 new eda_* figures (03_perspective_eda.py), stale flat PNGs removed
-- [ ] Phase 3 redesign Stage 3 — README findings reconciliation (partially done in Stage 2.5)
-- [ ] Phase 4 — ML methods (due 5 May)
+- [x] Phase 3 redesign Stage 3 — README findings reconciliation (H5 Spearman corrected to non-significant; pairwise claims softened)
+- [x] Phase 4 — ML methods (due 5 May)
 - [ ] Phase 5 — final report (due 18 May)
 
 ---
