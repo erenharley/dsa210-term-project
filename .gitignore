@@ -205,10 +205,3 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-
-# Claude Code assistant instructions (not for public repo)
-
-CLAUDE.md
-REWRITE_PROMPT.md
-stage0_data_enrichment_prompt.md
-stage1_per_country_eda_prompt.md
